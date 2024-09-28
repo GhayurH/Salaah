@@ -59,13 +59,14 @@ import pandas as pd
 
     # Basic
 start_year, end_year = 2024, 2024
-coordinates = [43.493056, -80.501111] # format: [lat, long]
-output_file_path = r'C:\Users\Ghayur Haider\Desktop\AZ\Git\Salaah\v2\praytimes - m4.xlsx'
+coordinates          = [43.493056, -80.501111] # format: [lat, long]
+elev                 = 0 # your elevation (only necesaary for high altitudes)
+output_file_path     = r'C:\Users\Ghayur Haider\Desktop\AZ\Git\Salaah\v2\praytimes - m4.xlsx'
 
     # Advanced
-Fajr_Angle = 16
+Fajr_Angle    = 16
 Maghrib_Angle = 4
-Isha_Angle = 14
+Isha_Angle    = 14
 
 
 
@@ -109,7 +110,7 @@ def decimal_to_hms(decimal_hours):
     seconds = int(((decimal_hours - hours) * 60 - minutes) * 60)
     return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
 
-def calculate_prayer_times(date_str, latitude, longitude, timezone, elevation=0):
+def calculate_prayer_times(date_str, latitude, longitude, timezone, elevation):
     declination, EqT = calculate_declination_eq_time(date_str)
 
     Dhuhr = 12 + timezone - longitude / 15.0 - EqT / 60.0
@@ -169,7 +170,7 @@ def save_prayer_times_to_xlsx(prayer_times_list, output_file):
 
 
 # Function to calculate prayer times for a specific date and coordinates
-def calculate_prayer_times_with_dst(year, month, day, coordinates):
+def calculate_prayer_times_with_dst(year, month, day, coordinates, elevation=0):
     dst_start = datetime(year, 3, (6 - datetime(year, 3, 1).weekday() + 8))  # Second Sunday of March
     dst_end = datetime(year, 11, (6 - datetime(year, 11, 1).weekday() + 1))  # First Sunday of November
     
@@ -177,7 +178,7 @@ def calculate_prayer_times_with_dst(year, month, day, coordinates):
     timezone = -4 if dst else -5  # UTC-4 with DST, UTC-5 without
 
     date_str = f'{day:02d}-{month:02d}-{year}'
-    prayer_times = calculate_prayer_times(date_str, coordinates[0], coordinates[1], timezone)
+    prayer_times = calculate_prayer_times(date_str, coordinates[0], coordinates[1], timezone, elevation)
 
     return prayer_times
 
@@ -190,7 +191,7 @@ for year in range(start_year, end_year + 1):
 
         for day in range(1, days_in_month + 1):
             try:
-                prayer_times = calculate_prayer_times_with_dst(year, month, day, coordinates)
+                prayer_times = calculate_prayer_times_with_dst(year, month, day, coordinates, elev)
                 all_prayer_times.append(prayer_times)
             except ValueError:
                 pass  # Ignore invalid dates
