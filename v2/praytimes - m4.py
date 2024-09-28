@@ -1,4 +1,5 @@
 '''
+todo: add way to pull timezone + dst auto (rn hardcoded)
 Shia Ithana Ashari Prayer Times Calculator
 ver 2
 date 28-09-2024
@@ -9,7 +10,7 @@ Uses astropy library to more accurately get astonomical data.
 
 IMPORTANT: Angle values:
 1. Fajr Angle:     16 deg      (per Leva Research Institute, Qum)
-2. Maghrib Angle:  4 deg       (author's best guess - to try to bring maghrib to approx sunset+15min, per scholarly guidance)
+2. Maghrib Angle:  4 deg       (best guess of praytimes.org)
 3. Isha Angle:     14 deg      (per Leva Research Institute, Qum)
 4. Midnight calculated as midpoint of Sunset and Fajr (This is harcoded)
 

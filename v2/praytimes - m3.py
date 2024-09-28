@@ -1,4 +1,5 @@
 '''
+todo: add way to pull timezone + dst auto (rn hardcoded)
 Shia Ithana Ashari Prayer Times Calculator
 ver 2
 date 28-09-2024
