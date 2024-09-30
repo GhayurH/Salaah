@@ -1,11 +1,8 @@
 '''
 ----------------------------------------------------------
 Shia Ithana Ashari Prayer Times Calculator
-ver 3
-date 28-09-2024
-----------------------------------------------------------
-----------------------------------------------------------
-todo: add way to pull timezone + dst auto (rn hardcoded)
+ver 4
+date 30-09-2024
 ----------------------------------------------------------
 Takes a start year, end year, and lat long coords and generates a .xlxs file of prayer times from 01-Jan-StartYear to 31-Dec-EndYear
 
@@ -40,39 +37,74 @@ PLEASE DO NOT REMOVE THIS COPYRIGHT BLOCK.
 Code inspired from praytimes.org.	
 '''
 
-
 import math
-from datetime import datetime
+from datetime import datetime, timedelta
 import pandas as pd
-
+from timezonefinder import TimezoneFinder
+import pytz
 
 # Define constants to be used
-
-    # Basic
-start_year, end_year = 2024, 2024
-coordinates          = [43.493056, -80.501111] # format: [lat, long]
-elev                 = 0 # your elevation (only necesaary for high altitudes)
-input_file_path = r'C:\Users\Ghayur Haider\Desktop\AZ\Git\Salaah\current version\EqT and D.csv'
+start_year, end_year = 2024, 2025
+coordinates          = [43.493056, -80.501111]  # format: [lat, long]
+elev                 = 0  # elevation, only necessary for high altitudes
+input_file_path      = r'C:\Users\Ghayur Haider\Desktop\AZ\Git\Salaah\current version\EqT and D.csv'
 df = pd.read_csv(input_file_path)
-output_file_path     = r'C:\Users\Ghayur Haider\Desktop\AZ\Git\Salaah\current version\praytimes - m4.xlsx'
+output_file_path     = r'C:\Users\Ghayur Haider\Desktop\AZ\Git\Salaah\current version\praytimes.xlsx'
 
-    # Advanced
+# Prayer time calculation constants
 Fajr_Angle    = 16
 Maghrib_Angle = 4
 Isha_Angle    = 14
 
 
+# Function to get timezone and DST information dynamically
+def get_timezone_and_dst_info(lat, lon, start_year=None, end_year=None):
+    tf = TimezoneFinder()
+    timezone_str = tf.timezone_at(lng=lon, lat=lat)
+
+    if timezone_str is None:
+        return "Timezone could not be determined."
+
+    timezone = pytz.timezone(timezone_str)
+    non_dst_time = timezone.localize(datetime(datetime.now().year, 1, 1))
+    utc_offset = non_dst_time.utcoffset().total_seconds() / 3600
+
+    min_year = 1900
+    max_year = 2100
+    valid_transitions = [t for t in timezone._utc_transition_times if min_year <= t.year <= max_year]
+
+    is_loc_dst = any(timezone.localize(transition).dst() != timedelta(0) for transition in valid_transitions)
+    
+    dst_start_dates = []
+    dst_end_dates = []
+    if start_year and end_year:
+        for year in range(start_year, end_year + 1):
+            jan_1 = datetime(year, 1, 1, tzinfo=pytz.utc)
+            dec_31 = datetime(year, 12, 31, tzinfo=pytz.utc)
+
+            for transition_time in valid_transitions:
+                transition_aware = pytz.utc.localize(transition_time)
+                if jan_1 <= transition_aware <= dec_31:
+                    if timezone.localize(transition_time).dst():
+                        dst_start_dates.append(transition_time.date())
+                    else:
+                        dst_end_dates.append(transition_time.date())
+
+    return {
+        "timezone_utc_offset": utc_offset,
+        "is_loc_dst": is_loc_dst,
+        "dst_start_dates": dst_start_dates if start_year and end_year else None,
+        "dst_end_dates": dst_end_dates if start_year and end_year else None
+    }
 
 
 # Function to pull declination and equation of time from .csv
 def calculate_declination_eqt(year, month, day):
-
     filtered_row = df[(df['date_y'] == year) & (df['date_m'] == month) & (df['date_d'] == day)]
-
     declination = filtered_row['D_sign'].values[0] * (filtered_row['D_deg'].values[0] + (filtered_row['D_min'].values[0] / 60) + (filtered_row['D_sec'].values[0] / 3600))
     EqT = filtered_row['EqT_sign'].values[0] * (filtered_row['EqT_m'].values[0] + (filtered_row['EqT_s'].values[0] / 60))
-
     return declination, EqT
+
 
 def T(x, latitude, declination):
     numerator = (-math.sin(math.radians(x)) - math.sin(math.radians(latitude)) * math.sin(math.radians(declination)))
@@ -80,11 +112,13 @@ def T(x, latitude, declination):
     cos_T = numerator / denominator
     return math.degrees(math.acos(cos_T)) / 15.0
 
+
 def decimal_to_hms(decimal_hours):
     hours = int(decimal_hours)
     minutes = int((decimal_hours - hours) * 60)
     seconds = int(((decimal_hours - hours) * 60 - minutes) * 60)
     return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
 
 def calculate_prayer_times(year, month, day, latitude, longitude, timezone, elevation):
     declination, EqT = calculate_declination_eqt(year, month, day)
@@ -107,7 +141,7 @@ def calculate_prayer_times(year, month, day, latitude, longitude, timezone, elev
     midnight = sunset + ((fajr + 24 - sunset) / 2)
 
     date_str = f'{day:02d}-{month:02d}-{year}'
-    
+
     prayer_times = {
         "Date": date_str,
         "Fajr": decimal_to_hms(fajr),
@@ -125,55 +159,34 @@ def calculate_prayer_times(year, month, day, latitude, longitude, timezone, elev
 
 def save_prayer_times_to_xlsx(prayer_times_list, output_file):
     df = pd.DataFrame(prayer_times_list)
-
-    # Define the column order and renaming if needed
     new_column_order = ['Date', 'Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Sunset', 'Maghrib', 'Isha', 'Midnight']
-    rename_columns = {
-        'Date': 'Date',
-        'Fajr': 'Fajr',
-        'Sunrise': 'Sunrise',
-        'Dhuhr': 'Dhuhr',
-        'Asr': 'Asr',
-        'Sunset': 'Sunset',
-        'Maghrib': 'Maghrib',
-        'Isha': 'Isha',
-        'Midnight': 'Midnight'
-    }
-
     df = df[new_column_order]
-    df.rename(columns=rename_columns, inplace=True)
-
-    # Save DataFrame to Excel
     df.to_excel(output_file, index=False)
 
 
-# Function to calculate prayer times for a specific date and coordinates
-def calculate_prayer_times_with_dst(year, month, day, coordinates, elevation=0):
-    dst_start = datetime(year, 3, (6 - datetime(year, 3, 1).weekday() + 8))  # Second Sunday of March
-    dst_end = datetime(year, 11, (6 - datetime(year, 11, 1).weekday() + 1))  # First Sunday of November
-    
-    dst = dst_start <= datetime(year, month, day) < dst_end
-    timezone = -4 if dst else -5  # UTC-4 with DST, UTC-5 without
-
-    #date_str = f'{day:02d}-{month:02d}-{year}'
-    prayer_times = calculate_prayer_times(year, month, day, coordinates[0], coordinates[1], timezone, elevation)
-
-    return prayer_times
-
-
+# Main Loop to calculate prayer times for the year range
 all_prayer_times = []
+lat, lon = coordinates
+tz_info = get_timezone_and_dst_info(lat, lon, start_year, end_year)
+
+# Get base timezone offset
+base_timezone = tz_info['timezone_utc_offset']
 
 for year in range(start_year, end_year + 1):
     for month in range(1, 13):
         days_in_month = 31 if month in [1, 3, 5, 7, 8, 10, 12] else 30 if month in [4, 6, 9, 11] else 29 if (year % 4 == 0 and year % 100 != 0) or (year % 400 == 0) else 28
-
         for day in range(1, days_in_month + 1):
             try:
-                prayer_times = calculate_prayer_times_with_dst(year, month, day, coordinates, elev)
+                current_date = datetime(year, month, day).date()
+
+                # Check if the current date is within the DST period
+                is_dst = any(start <= current_date < end for start, end in zip(tz_info['dst_start_dates'], tz_info['dst_end_dates'])) if tz_info['dst_start_dates'] and tz_info['dst_end_dates'] else False
+                timezone = base_timezone + 1 if is_dst else base_timezone  # Adjust for DST
+
+                prayer_times = calculate_prayer_times(year, month, day, lat, lon, timezone, elev)
                 all_prayer_times.append(prayer_times)
             except ValueError:
                 pass  # Ignore invalid dates
-
 
 # Save the prayer times to an Excel file
 save_prayer_times_to_xlsx(all_prayer_times, output_file_path)
