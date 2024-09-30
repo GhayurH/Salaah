@@ -22,19 +22,14 @@ IMPORTANT: Angle values:
 
 ----------------------------------------------------------
 
-License: GNU LGPL v3.0
+License: GNU GPL v3.0
 
 TERMS OF USE:
-	Permission is granted to use this code, with or
-	without modification, in any website or application
-	provided that credit is given to the original work
-	with a link back to PrayTimes.org.
+Permission is granted to use this code, with or without modification, in any website or application, as long as credit is given to the original work with a link back to https://github.com/GhayurH/Salaah. The use of this code cannot be for monetary profit, except if the website or application hosting the code also displays advertisements, provided that it is not solely dedicated to running this code.
 
-This program is distributed in the hope that it will
-be useful, but WITHOUT ANY WARRANTY.
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY.
 
 PLEASE DO NOT REMOVE THIS COPYRIGHT BLOCK.
-
 
 ---------------------Acknowledgement-------------------------
 Code inspired from praytimes.org.	
