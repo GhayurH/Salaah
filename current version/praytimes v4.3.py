@@ -42,12 +42,13 @@ from geopy.geocoders import Nominatim
 
 # Define constants to be used
 start_year, end_year   = 2024, 2025
-coordinates            = [43.429516, -80.484115]  # format: [lat, long] #Kitchener
+# coordinates          = [43.429516, -80.484115]  # format: [lat, long] #Kitchener
+coordinates            = [43.441318, -80.487407] # AZSA
 # coordinates          = [42.298759, -83.035436] #Windsor
 # coordinates          = [43.841668, -79.460900] #JCC
 elev                   = 0  # elevation, only necessary for high altitudes
 input_file_path        = r'C:\Users\Ghayur Haider\Desktop\AZ\Git\Salaah\current version\EqT and D.csv'
-output_xlsx_path       = r'C:\Users\Ghayur Haider\Desktop\AZ\Git\Salaah\current version\praytimes.xlsx'
+output_xlsx_path       = r'C:\Users\Ghayur Haider\Desktop\AZ\Git\Salaah\current version\praytimes AZSA.xlsx'
 output_image_directory = r'C:\Users\Ghayur Haider\Desktop\AZ\Git\Salaah\current version\images'
 
 # Prayer time calculation constants
