@@ -32,6 +32,7 @@ PLEASE DO NOT REMOVE THIS COPYRIGHT BLOCK.
 Code inspired by praytimes.org.
 '''
 
+import os
 import math
 from datetime import datetime, timedelta
 import pandas as pd
@@ -41,15 +42,15 @@ import matplotlib.pyplot as plt
 from geopy.geocoders import Nominatim
 
 # Define constants to be used
-start_year, end_year   = 2024, 2025
-# coordinates          = [43.429516, -80.484115]  # format: [lat, long] #Kitchener
-coordinates            = [43.441318, -80.487407] # AZSA
-# coordinates          = [42.298759, -83.035436] #Windsor
+start_year, end_year   = 2025, 2025
 # coordinates          = [43.841668, -79.460900] #JCC
+# coordinates          = [43.429516, -80.484115] # format: [lat, long] #Kitchener
+# coordinates          = [43.441318, -80.487407] # AZSA
+coordinates            = [42.298759, -83.035436] # Windsor
 elev                   = 0  # elevation, only necessary for high altitudes
 input_file_path        = r'C:\Users\Ghayur Haider\Desktop\AZ\Git\Salaah\current version\EqT and D.csv'
-output_xlsx_path       = r'C:\Users\Ghayur Haider\Desktop\AZ\Git\Salaah\current version\praytimes AZSA.xlsx'
-output_image_directory = r'C:\Users\Ghayur Haider\Desktop\AZ\Git\Salaah\current version\images'
+output_xlsx_path       = r'C:\Users\Ghayur Haider\Desktop\AZ\Git\Salaah\output\Windsor 2024.xlsx'
+output_image_directory = r'C:\Users\Ghayur Haider\Desktop\AZ\Git\Salaah\output\images'
 
 # Prayer time calculation constants
 Fajr_Angle    = 16
@@ -289,6 +290,15 @@ def main():
             all_prayer_times.append(prayer_times)
         except ValueError as e:
             print(f"Skipping invalid date {date_obj}: {e}")
+    
+    # Ensure the directory for the Excel output file exists
+    xlsx_dir = os.path.dirname(output_xlsx_path)
+    if not os.path.exists(xlsx_dir):
+        os.makedirs(xlsx_dir)
+
+    # Ensure the output image directory exists
+    if not os.path.exists(output_image_directory):
+        os.makedirs(output_image_directory)
 
     # Save prayer times to Excel and generate images
     save_prayer_times_to_xlsx(all_prayer_times, output_xlsx_path)
