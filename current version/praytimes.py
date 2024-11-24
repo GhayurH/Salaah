@@ -1,7 +1,7 @@
 '''
 ----------------------------------------------------------
 Shia Ithana Ashari Prayer Times Calculator
-Version 4.4
+Version 4.5
 Date: 24-11-2024
 ----------------------------------------------------------
 Inputs: a start year, end year, and latitude/longitude coordinates
@@ -34,7 +34,7 @@ Code inspired by praytimes.org.
 
 import os
 import math
-from datetime import datetime, timedelta
+from datetime import datetime
 import pandas as pd
 from timezonefinder import TimezoneFinder
 import pytz
@@ -51,7 +51,7 @@ coordinates            = [42.298759, -83.035436] # Windsor
 elev                   = 0  # elevation, only necessary for high altitudes
 input_file_path        = r'C:\Users\Ghayur Haider\Desktop\AZ\Git\Salaah\current version\EqT and D.csv'
 output_directory       = r'C:\Users\Ghayur Haider\Desktop\AZ\Git\Salaah\output'
-output_filename        = 'Windsor 2024.xlsx'
+output_filename        = 'Windsor 2025.xlsx'
 
 # Prayer time calculation constants
 Fajr_Angle    = 16
@@ -65,14 +65,20 @@ plt.rcParams['font.size']   = 12
 # Pre-process the CSV data and index by date for fast lookup
 df = pd.read_csv(input_file_path)
 # Combine year, month, and day into a string format 'YYYY-MM-DD'
-df['Date'] = df['date_y'].astype(str) + '-' + df['date_m'].astype(str).str.zfill(2) + '-' + df['date_d'].astype(str).str.zfill(2)
+df['Date'] = (
+    df['date_y'].astype(str)
+    + '-'
+    + df['date_m'].astype(str).str.zfill(2)
+    + '-'
+    + df['date_d'].astype(str).str.zfill(2)
+)
 # Convert the combined string column to a datetime object
 df['Date'] = pd.to_datetime(df['Date'], format='%Y-%m-%d', errors='coerce')
 df.set_index('Date', inplace=True)
 
 # Geopy function to get city name
 def get_city_name(lat, lon):
-    geolocator = Nominatim(user_agent="cityfind")
+    geolocator = Nominatim(user_agent="prayer_times_calculator")
     location = geolocator.reverse((lat, lon), exactly_one=True)
     if location and 'city' in location.raw['address']:
         return location.raw['address']['city']
@@ -83,53 +89,19 @@ def get_city_name(lat, lon):
     else:
         return "Unknown Location"
 
-# Function to get timezone and DST information dynamically
-def get_timezone_and_dst_info(lat, lon, start_year=None, end_year=None):
-    tf = TimezoneFinder()
-    timezone_str = tf.timezone_at(lng=lon, lat=lat)
-
-    if timezone_str is None:
-        return "Timezone could not be determined."
-
-    timezone = pytz.timezone(timezone_str)
-    non_dst_time = timezone.localize(datetime(datetime.now().year, 1, 1))
-    utc_offset = non_dst_time.utcoffset().total_seconds() / 3600
-
-    min_year = 1900
-    max_year = 2100
-    valid_transitions = [t for t in timezone._utc_transition_times if min_year <= t.year <= max_year]
-
-    is_loc_dst = any(timezone.localize(transition).dst() != timedelta(0) for transition in valid_transitions)
-
-    dst_start_dates = []
-    dst_end_dates = []
-    if start_year and end_year:
-        for year in range(start_year, end_year + 1):
-            jan_1 = datetime(year, 1, 1, tzinfo=pytz.utc)
-            dec_31 = datetime(year, 12, 31, tzinfo=pytz.utc)
-
-            for transition_time in valid_transitions:
-                transition_aware = pytz.utc.localize(transition_time)
-                if jan_1 <= transition_aware <= dec_31:
-                    if timezone.localize(transition_time).dst():
-                        dst_start_dates.append(transition_time.date())
-                    else:
-                        dst_end_dates.append(transition_time.date())
-
-    return {
-        "timezone_utc_offset": utc_offset,
-        "is_loc_dst": is_loc_dst,
-        "dst_start_dates": dst_start_dates if start_year and end_year else None,
-        "dst_end_dates": dst_end_dates if start_year and end_year else None
-    }
-
 
 # Function to calculate declination and equation of time from the pre-processed CSV
 def calculate_declination_eqt(date_obj):
     if date_obj in df.index:
         filtered_row = df.loc[date_obj]
-        declination = filtered_row['D_sign'] * (filtered_row['D_deg'] + (filtered_row['D_min'] / 60) + (filtered_row['D_sec'] / 3600))
-        EqT = filtered_row['EqT_sign'] * (filtered_row['EqT_m'] + (filtered_row['EqT_s'] / 60))
+        declination = filtered_row['D_sign'] * (
+            filtered_row['D_deg']
+            + (filtered_row['D_min'] / 60)
+            + (filtered_row['D_sec'] / 3600)
+        )
+        EqT = filtered_row['EqT_sign'] * (
+            filtered_row['EqT_m'] + (filtered_row['EqT_s'] / 60)
+        )
         return declination, EqT
     else:
         raise ValueError(f"No Declination and EqT data found for date: {date_obj}")
@@ -137,8 +109,11 @@ def calculate_declination_eqt(date_obj):
 
 # Helper function for prayer time calculations
 def T(x, latitude, declination):
-    numerator = (-math.sin(math.radians(x)) - math.sin(math.radians(latitude)) * math.sin(math.radians(declination)))
-    denominator = (math.cos(math.radians(latitude)) * math.cos(math.radians(declination)))
+    numerator = (
+        -math.sin(math.radians(x))
+        - math.sin(math.radians(latitude)) * math.sin(math.radians(declination))
+    )
+    denominator = math.cos(math.radians(latitude)) * math.cos(math.radians(declination))
     cos_T = numerator / denominator
     return math.degrees(math.acos(cos_T)) / 15.0
 
@@ -152,43 +127,64 @@ def decimal_to_hms(decimal_hours):
 
 
 # Function to calculate prayer times
-def calculate_prayer_times(date_obj, latitude, longitude, timezone, elevation):
+def calculate_prayer_times(date_obj, latitude, longitude, timezone_offset, elevation):
     declination, EqT = calculate_declination_eqt(date_obj)
 
-    Dhuhr = 12 + timezone - longitude / 15.0 - EqT / 60.0
-    sunrise = Dhuhr - T(0.833 + (0.0347 * math.sqrt(elevation)), latitude, declination)
-    sunset = Dhuhr + T(0.833 + (0.0347 * math.sqrt(elevation)), latitude, declination)
+    Dhuhr = 12 + timezone_offset - longitude / 15.0 - EqT / 60.0
+    sunrise = Dhuhr - T(
+        0.833 + (0.0347 * math.sqrt(elevation)), latitude, declination
+    )
+    sunset = Dhuhr + T(
+        0.833 + (0.0347 * math.sqrt(elevation)), latitude, declination
+    )
 
     fajr = Dhuhr - T(Fajr_Angle, latitude, declination)
     isha = Dhuhr + T(Isha_Angle, latitude, declination)
 
-    num1 = math.sin(math.atan2(1, 1 + math.tan(math.radians(abs(latitude - declination)))))
-    num2 = math.sin(math.radians(latitude)) * math.sin(math.radians(declination))
-    deno = (math.cos(math.radians(latitude)) * math.cos(math.radians(declination)))
-    cos_A = (num1 - num2) / deno
-    asr_A = math.degrees(math.acos(cos_A)) / 15.0
-    Asr = Dhuhr + asr_A
+    try:
+        num1 = math.sin(
+            math.atan2(1, 1 + math.tan(math.radians(abs(latitude - declination))))
+        )
+        num2 = math.sin(math.radians(latitude)) * math.sin(math.radians(declination))
+        deno = math.cos(math.radians(latitude)) * math.cos(math.radians(declination))
+        cos_A = (num1 - num2) / deno
+
+        asr_A = math.degrees(math.acos(cos_A)) / 15.0
+        Asr = Dhuhr + asr_A
+    except ValueError:
+        # Handle cases where Asr cannot be calculated
+        Asr = None
 
     maghrib = Dhuhr + T(Maghrib_Angle, latitude, declination)
     midnight = sunset + ((fajr + 24 - sunset) / 2)
 
     return {
-        "Date": date_obj,  # Store as datetime object
+        "Date": date_obj,
         "Fajr": decimal_to_hms(fajr),
         "Sunrise": decimal_to_hms(sunrise),
         "Dhuhr": decimal_to_hms(Dhuhr),
-        "Asr": decimal_to_hms(Asr),
+        "Asr": decimal_to_hms(Asr) if Asr else "N/A",
         "Sunset": decimal_to_hms(sunset),
         "Maghrib": decimal_to_hms(maghrib),
         "Isha": decimal_to_hms(isha),
-        "Midnight": decimal_to_hms(midnight)
+        "Midnight": decimal_to_hms(midnight),
     }
 
 
 # Function to save prayer times to an Excel file
 def save_prayer_times_to_xlsx(prayer_times_list, output_file):
     df = pd.DataFrame(prayer_times_list)
-    new_column_order = ['Date', 'Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Sunset', 'Maghrib', 'Isha', 'Midnight']
+    new_column_order = [
+        'Date',
+        'Fajr',
+        'Sunrise',
+        'Dhuhr',
+        'Asr',
+        'Sunset',
+        'Maghrib',
+        'Isha',
+        'Midnight',
+    ]
     df = df[new_column_order]
 
     df['Date'] = pd.to_datetime(df['Date']) # Convert Date column to datetime format (useful if excel failing to recognize this natively as a date)
@@ -211,10 +207,12 @@ def save_batch_images(prayer_times_list, output_directory, city_name):
 
     # Generate images in batches
     for (year, month), group in grouped:
-        table_data = group[['Date', 'Fajr', 'Sunrise', 'Dhuhr', 'Sunset', 'Maghrib', 'Midnight']]
+        table_data = group[
+            ['Date', 'Fajr', 'Sunrise', 'Dhuhr', 'Sunset', 'Maghrib', 'Midnight']
+        ]
 
         # Dynamically calculate figure size based on table content
-        fig_width = len(table_data.columns) * .6
+        fig_width = len(table_data.columns) * 0.6
         fig_height = len(table_data) * 0.225  # Adding space for the title and subtitle
 
         fig, ax = plt.subplots(figsize=(fig_width, fig_height))
@@ -225,13 +223,15 @@ def save_batch_images(prayer_times_list, output_directory, city_name):
         # Explicitly cast to string to avoid FutureWarning
         table_data['Date'] = table_data['Date'].dt.strftime('%b %d')
 
-        table = ax.table(cellText=table_data.values,
-                         colLabels=table_data.columns,
-                         cellLoc='center',
-                         loc='center')
+        table = ax.table(
+            cellText=table_data.values,
+            colLabels=table_data.columns,
+            cellLoc='center',
+            loc='center',
+        )
 
         # Adjust column width to fit content
-        table.auto_set_column_width([0, 1, 2, 3, 4, 5, 6])
+        table.auto_set_column_width(col=list(range(len(table_data.columns))))
 
         # Style the table (font, color)
         for (i, j), cell in table.get_celld().items():
@@ -259,15 +259,16 @@ def save_batch_images(prayer_times_list, output_directory, city_name):
                     cell.set_text_props(color='#0170BF')  # Blue for Maghrib and Midnight
 
         # Set title and subtitle with city name
-        plt.suptitle(f'{month} {year} Prayer Times', fontsize=16, ha='center', va='center', y=0.98)
+        plt.suptitle(
+            f'{month} {year} Prayer Times', fontsize=16, ha='center', va='center', y=0.98
+        )
         plt.title(f'for {city_name}', fontsize=12, ha='center', va='center')
 
         plt.tight_layout(pad=0.0)
 
-        image_path = f'{output_directory}/{city_name} - {month} {year}.png'
+        image_path = os.path.join(output_directory, f'{city_name} - {month} {year}.png')
         plt.savefig(image_path, bbox_inches='tight', dpi=300)
         plt.close(fig)
-
 
 
 # Main loop to calculate prayer times for the year range
@@ -275,25 +276,31 @@ def main():
     all_prayer_times = []
     lat, lon = coordinates
     city_name = get_city_name(lat, lon)  # Get the city name based on latitude and longitude
-    tz_info = get_timezone_and_dst_info(lat, lon, start_year, end_year)
 
-    base_timezone = tz_info['timezone_utc_offset']
+    # Get timezone information
+    tf = TimezoneFinder()
+    timezone_str = tf.timezone_at(lng=lon, lat=lat)
+    if timezone_str is None:
+        print("Timezone could not be determined.")
+        return
+    tz = pytz.timezone(timezone_str)
 
     date_range = pd.date_range(start=f'{start_year}-01-01', end=f'{end_year}-12-31')
 
     for date_obj in date_range:
         try:
-            # Check if the current date is within the DST period
-            is_dst = any(
-                start <= date_obj.date() < end
-                for start, end in zip(tz_info['dst_start_dates'], tz_info['dst_end_dates'])
-            ) if tz_info['dst_start_dates'] and tz_info['dst_end_dates'] else False
-            timezone = base_timezone + 1 if is_dst else base_timezone
+            # Localize at noon to correctly capture DST transitions
+            localized_date = tz.localize(
+                datetime(date_obj.year, date_obj.month, date_obj.day, 12, 0, 0)
+            )
+            timezone_offset = localized_date.utcoffset().total_seconds() / 3600.0
 
-            prayer_times = calculate_prayer_times(date_obj, lat, lon, timezone, elev)
+            prayer_times = calculate_prayer_times(
+                date_obj, lat, lon, timezone_offset, elev
+            )
             all_prayer_times.append(prayer_times)
-        except ValueError as e:
-            print(f"Skipping invalid date {date_obj}: {e}")
+        except Exception as e:
+            print(f"Skipping date {date_obj}: {e}")
 
     # Ensure the output directory exists
     if not os.path.exists(output_directory):
