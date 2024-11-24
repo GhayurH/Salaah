@@ -1,8 +1,8 @@
 '''
 ----------------------------------------------------------
 Shia Ithana Ashari Prayer Times Calculator
-Version 4.3
-Date: 30-09-2024
+Version 4.4
+Date: 24-11-2024
 ----------------------------------------------------------
 Inputs: a start year, end year, and latitude/longitude coordinates
 Outputs: an .xlsx file of prayer times from 01-Jan-StartYear to 31-Dec-EndYear, and images of the prayer times table for each calendar month    
@@ -43,14 +43,15 @@ from geopy.geocoders import Nominatim
 
 # Define constants to be used
 start_year, end_year   = 2025, 2025
-# coordinates          = [43.841668, -79.460900] #JCC
-# coordinates          = [43.429516, -80.484115] # format: [lat, long] #Kitchener
+# coordinates          = [43.841668, -79.460900] # JCC
+# coordinates          = [43.429516, -80.484115] # Kitchener
 # coordinates          = [43.441318, -80.487407] # AZSA
+# coordinates          = [lat, long]
 coordinates            = [42.298759, -83.035436] # Windsor
 elev                   = 0  # elevation, only necessary for high altitudes
 input_file_path        = r'C:\Users\Ghayur Haider\Desktop\AZ\Git\Salaah\current version\EqT and D.csv'
-output_xlsx_path       = r'C:\Users\Ghayur Haider\Desktop\AZ\Git\Salaah\output\Windsor 2024.xlsx'
-output_image_directory = r'C:\Users\Ghayur Haider\Desktop\AZ\Git\Salaah\output\images'
+output_directory       = r'C:\Users\Ghayur Haider\Desktop\AZ\Git\Salaah\output'
+output_filename        = 'Windsor 2024.xlsx'
 
 # Prayer time calculation constants
 Fajr_Angle    = 16
@@ -283,31 +284,37 @@ def main():
     for date_obj in date_range:
         try:
             # Check if the current date is within the DST period
-            is_dst = any(start <= date_obj.date() < end for start, end in zip(tz_info['dst_start_dates'], tz_info['dst_end_dates'])) if tz_info['dst_start_dates'] and tz_info['dst_end_dates'] else False
+            is_dst = any(
+                start <= date_obj.date() < end
+                for start, end in zip(tz_info['dst_start_dates'], tz_info['dst_end_dates'])
+            ) if tz_info['dst_start_dates'] and tz_info['dst_end_dates'] else False
             timezone = base_timezone + 1 if is_dst else base_timezone
 
             prayer_times = calculate_prayer_times(date_obj, lat, lon, timezone, elev)
             all_prayer_times.append(prayer_times)
         except ValueError as e:
             print(f"Skipping invalid date {date_obj}: {e}")
-    
-    # Ensure the directory for the Excel output file exists
-    xlsx_dir = os.path.dirname(output_xlsx_path)
-    if not os.path.exists(xlsx_dir):
-        os.makedirs(xlsx_dir)
 
-    # Ensure the output image directory exists
-    if not os.path.exists(output_image_directory):
-        os.makedirs(output_image_directory)
+    # Ensure the output directory exists
+    if not os.path.exists(output_directory):
+        os.makedirs(output_directory)
+
+    # Ensure the images subdirectory exists
+    images_subdir = os.path.join(output_directory, 'images')
+    if not os.path.exists(images_subdir):
+        os.makedirs(images_subdir)
+
+    # Prepare the output paths
+    output_xlsx_path = os.path.join(output_directory, output_filename)
 
     # Save prayer times to Excel and generate images
     save_prayer_times_to_xlsx(all_prayer_times, output_xlsx_path)
-    save_batch_images(all_prayer_times, output_image_directory, city_name)
+    save_batch_images(all_prayer_times, images_subdir, city_name)
+
+    print(f'Prayer times saved to {output_xlsx_path}')
+    print(f'Monthly images saved to {images_subdir}')
 
 
 # Execute the main function
 if __name__ == '__main__':
     main()
-
-print(f'Prayer times saved to {output_xlsx_path}')
-print(f'Monthly images saved to {output_image_directory}')
