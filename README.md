@@ -34,4 +34,5 @@ This program is distributed in the hope that it will be useful, but WITHOUT ANY 
 PLEASE DO NOT REMOVE THIS COPYRIGHT BLOCK.
 
 ---------------------Acknowledgement-------------------------
-Code inspired by praytimes.org.
+
+Code inspired by praytimes.org
